@@ -1,0 +1,215 @@
+// YOMU Digital Library - Prisma Schema
+// NestJS + PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum Role {
+  SISWA
+  ADMIN
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  BORROWED
+  RETURNING
+  RETURNED
+  REJECTED
+  OVERDUE
+}
+
+enum BookCondition {
+  GOOD
+  DAMAGED
+}
+
+enum MessageType {
+  TEXT
+  BOOK_CARD
+}
+
+// ==================== MODELS ====================
+
+model Major {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  users User[]
+
+  @@map("majors")
+}
+
+model Class {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  users User[]
+
+  @@map("classes")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  name       String
+  role       Role     @default(SISWA)
+  avatarUrl  String?  @map("avatar_url")
+  majorId    String?  @map("major_id")
+  classId    String?  @map("class_id")
+  isActive   Boolean  @default(true) @map("is_active")
+  deletedAt  DateTime? @map("deleted_at") // Soft delete
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  major         Major?   @relation(fields: [majorId], references: [id])
+  class         Class?   @relation(fields: [classId], references: [id])
+  loans         Loan[]   @relation("UserLoans")
+  verifiedLoans Loan[]   @relation("VerifiedLoans")
+  favorites     Favorite[]
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  conversations1   Conversation[] @relation("Participant1")
+  conversations2   Conversation[] @relation("Participant2")
+  reviews          Review[]
+
+  @@map("users")
+}
+
+model Book {  
+  id             String   @id @default(uuid())
+  title          String
+  author         String
+  publisher      String
+  year           Int
+  isbn           String   @unique
+  categoryId     String   @map("category_id")
+  synopsis       String   @db.Text
+  coverUrl       String?  @map("cover_url")
+  stock          Int      @default(0)
+  availableStock Int      @default(0) @map("available_stock")
+  deletedAt      DateTime? @map("deleted_at") // Soft delete
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  category  Category   @relation(fields: [categoryId], references: [id])
+  loans     Loan[]
+  favorites Favorite[]
+  messages  Message[]
+  reviews   Review[]
+
+  @@map("books")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  color       String?  @default("#3b82f6") // Hex color code
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  books Book[]
+
+  @@map("categories")
+}
+
+model Loan {
+  id            String        @id @default(uuid())
+  userId        String        @map("user_id")
+  bookId        String        @map("book_id")
+  loanDate      DateTime      @default(now()) @map("loan_date")
+  dueDate       DateTime      @map("due_date")
+  returnDate    DateTime?     @map("return_date")
+  status        LoanStatus    @default(PENDING)
+  bookCondition BookCondition? @map("book_condition")
+  adminNotes    String?       @db.Text @map("admin_notes")
+  verifiedBy    String?       @map("verified_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  user     User  @relation("UserLoans", fields: [userId], references: [id])
+  book     Book  @relation(fields: [bookId], references: [id])
+  verifier User? @relation("VerifiedLoans", fields: [verifiedBy], references: [id])
+
+  @@map("loans")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@map("favorites")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  senderId    String      @map("sender_id")
+  receiverId  String      @map("receiver_id")
+  content     String      @db.Text
+  isRead      Boolean     @default(false) @map("is_read")
+  messageType MessageType @default(TEXT) @map("message_type")
+  bookId      String?     @map("book_id") // For BOOK_CARD type
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  sender   User  @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User  @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  book     Book? @relation(fields: [bookId], references: [id])
+
+  @@map("messages")
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  participant1Id String   @map("participant_1")
+  participant2Id String   @map("participant_2")
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  participant1 User @relation("Participant1", fields: [participant1Id], references: [id])
+  participant2 User @relation("Participant2", fields: [participant2Id], references: [id])
+
+  @@unique([participant1Id, participant2Id])
+  @@map("conversations")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int
+  comment   String   @db.Text
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId])
+  @@map("reviews")
+}
