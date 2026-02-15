@@ -1,6 +1,7 @@
 import {
     Controller,
     Get,
+    Post,
     Put,
     Delete,
     Body,
@@ -20,6 +21,16 @@ import { Role } from '@prisma/client';
 @Roles(Role.ADMIN)
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
+
+    @Post()
+    async create(@Body() body: { name: string; email: string; password: string; majorId?: string; classId?: string }) {
+        const user = await this.usersService.create(body);
+        return {
+            success: true,
+            message: 'User created successfully',
+            data: user,
+        };
+    }
 
     @Get()
     async findAll(@Query() query: QueryUsersDto) {

@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UpdateUserStatusDto, QueryUsersDto } from './dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -70,6 +71,43 @@ export class UsersService {
                 totalPages: Math.ceil(total / limit),
             },
         };
+    }
+
+    async create(data: { name: string; email: string; password: string; majorId?: string; classId?: string; role?: Role }) {
+        // Check if email already exists
+        const existing = await this.prisma.user.findFirst({
+            where: { email: data.email, deletedAt: null },
+        });
+        if (existing) {
+            throw new ConflictException('Email sudah terdaftar');
+        }
+
+        const hashedPassword = await bcrypt.hash(data.password, 10);
+
+        return this.prisma.user.create({
+            data: {
+                name: data.name,
+                email: data.email,
+                password: hashedPassword,
+                majorId: data.majorId,
+                classId: data.classId,
+                role: data.role || Role.SISWA,
+            },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                majorId: true,
+                classId: true,
+                major: true,
+                class: true,
+                avatarUrl: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
     }
 
     async findOne(id: string) {
