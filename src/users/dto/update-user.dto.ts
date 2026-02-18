@@ -25,6 +25,10 @@ export class UpdateUserDto {
     @IsOptional()
     @IsString()
     avatarUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    password?: string;
 }
 
 export class UpdateUserStatusDto {

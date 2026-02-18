@@ -166,6 +166,7 @@ export class UsersService {
                 classId: dto.classId,
                 role: dto.role,
                 avatarUrl: dto.avatarUrl,
+                ...(dto.password ? { password: await bcrypt.hash(dto.password, 10) } : {}),
             },
             select: {
                 id: true,

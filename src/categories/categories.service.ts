@@ -8,21 +8,30 @@ export class CategoriesService {
 
     async findAll() {
         return this.prisma.category.findMany({
+            where: { deletedAt: null },
             orderBy: { name: 'asc' },
             include: {
                 _count: {
-                    select: { books: true },
+                    select: {
+                        books: {
+                            where: { deletedAt: null }
+                        }
+                    },
                 },
             },
         });
     }
 
     async findOne(id: string) {
-        const category = await this.prisma.category.findUnique({
-            where: { id },
+        const category = await this.prisma.category.findFirst({
+            where: { id, deletedAt: null },
             include: {
                 _count: {
-                    select: { books: true },
+                    select: {
+                        books: {
+                            where: { deletedAt: null }
+                        }
+                    },
                 },
             },
         });
@@ -35,12 +44,24 @@ export class CategoriesService {
     }
 
     async create(dto: CreateCategoryDto) {
-        // Check if name already exists
+        // Check if name already exists (including soft-deleted)
         const existing = await this.prisma.category.findUnique({
             where: { name: dto.name },
         });
 
         if (existing) {
+            if (existing.deletedAt) {
+                // Restore soft-deleted category
+                return this.prisma.category.update({
+                    where: { id: existing.id },
+                    data: {
+                        deletedAt: null,
+                        color: dto.color,
+                        description: dto.description,
+                    },
+                });
+            }
+
             throw new ConflictException('Category name already exists');
         }
 
@@ -62,6 +83,7 @@ export class CategoriesService {
             const existing = await this.prisma.category.findFirst({
                 where: {
                     name: dto.name,
+                    deletedAt: null,
                     NOT: { id },
                 },
             });
@@ -86,14 +108,16 @@ export class CategoriesService {
         const category = await this.findOne(id);
 
         // Check if category has books
+        // findOne already filters the count, so we can use it directly
         if (category._count.books > 0) {
             throw new ConflictException(
                 'Cannot delete category with associated books. Remove or reassign books first.',
             );
         }
 
-        await this.prisma.category.delete({
+        await this.prisma.category.update({
             where: { id },
+            data: { deletedAt: new Date() },
         });
 
         return { message: 'Category deleted successfully' };

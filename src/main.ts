@@ -43,6 +43,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   const port = process.env.PORT || 3000;
+  app.enableShutdownHooks();
   await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 YOMU Backend is running on: ${await app.getUrl()}/api`);
