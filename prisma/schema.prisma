@@ -73,6 +73,8 @@ model Book {
   messages       Message[]
   reviews        Review[]
 
+  @@index([title])
+  @@index([categoryId])
   @@map("books")
 }
 
@@ -97,6 +99,7 @@ model Loan {
   returnDate    DateTime?      @map("return_date")
   status        LoanStatus     @default(PENDING)
   bookCondition BookCondition? @map("book_condition")
+  fineAmount    Int?           @map("fine_amount")
   adminNotes    String?        @map("admin_notes")
   verifiedBy    String?        @map("verified_by")
   createdAt     DateTime       @default(now()) @map("created_at")
@@ -105,6 +108,8 @@ model Loan {
   user          User           @relation("UserLoans", fields: [userId], references: [id])
   verifier      User?          @relation("VerifiedLoans", fields: [verifiedBy], references: [id])
 
+  @@index([userId])
+  @@index([status])
   @@map("loans")
 }
 
@@ -126,13 +131,17 @@ model Message {
   receiverId  String      @map("receiver_id")
   content     String
   isRead      Boolean     @default(false) @map("is_read")
+  isEdited    Boolean     @default(false) @map("is_edited")
   messageType MessageType @default(TEXT) @map("message_type")
   bookId      String?     @map("book_id")
   createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
   book        Book?       @relation(fields: [bookId], references: [id])
   receiver    User        @relation("ReceivedMessages", fields: [receiverId], references: [id])
   sender      User        @relation("SentMessages", fields: [senderId], references: [id])
 
+  @@index([senderId])
+  @@index([receiverId])
   @@map("messages")
 }
 
@@ -181,6 +190,7 @@ enum LoanStatus {
 enum BookCondition {
   GOOD
   DAMAGED
+  LOST
 }
 
 enum MessageType {

@@ -192,7 +192,51 @@ export class LoansService {
             );
         }
 
-        // Update loan status to RETURNING
+        // Students can only return on or after the due date
+        // Use WIB timezone (UTC+7) for date comparison since users are in Indonesia
+        const WIB_OFFSET = 7 * 60 * 60 * 1000; // 7 hours in ms
+        const nowWIB = new Date(Date.now() + WIB_OFFSET);
+        const todayWIB = new Date(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), nowWIB.getUTCDate());
+        const dueDateWIB = new Date(new Date(loan.dueDate).getTime() + WIB_OFFSET);
+        const dueDayWIB = new Date(dueDateWIB.getUTCFullYear(), dueDateWIB.getUTCMonth(), dueDateWIB.getUTCDate());
+
+        if (todayWIB < dueDayWIB && loan.status !== LoanStatus.OVERDUE) {
+            const daysLeft = Math.ceil(
+                (dueDayWIB.getTime() - todayWIB.getTime()) / (1000 * 60 * 60 * 24),
+            );
+            throw new BadRequestException(
+                `Buku baru bisa dikembalikan pada tanggal jatuh tempo. Tunggu ${daysLeft} hari lagi.`,
+            );
+        }
+
+        // If book is in GOOD condition → auto-complete return (no admin verification needed)
+        if (dto.bookCondition === BookCondition.GOOD) {
+            const [updatedLoan] = await this.prisma.$transaction([
+                this.prisma.loan.update({
+                    where: { id: loanId },
+                    data: {
+                        status: LoanStatus.RETURNED,
+                        bookCondition: BookCondition.GOOD,
+                        returnDate: new Date(),
+                    },
+                    include: {
+                        book: {
+                            select: { id: true, title: true, author: true },
+                        },
+                    },
+                }),
+                this.prisma.book.update({
+                    where: { id: loan.bookId },
+                    data: {
+                        availableStock: { increment: 1 },
+                    },
+                }),
+            ]);
+
+            return updatedLoan;
+        }
+
+        // If DAMAGED or LOST → send to admin verification (RETURNING status)
         const updatedLoan = await this.prisma.loan.update({
             where: { id: loanId },
             data: {
@@ -230,9 +274,26 @@ export class LoansService {
             throw new BadRequestException('Book is no longer available');
         }
 
-        // Use transaction to update loan and decrease stock
-        const [updatedLoan] = await this.prisma.$transaction([
-            this.prisma.loan.update({
+        // Use an interactive transaction for absolute safety against race conditions
+        const updatedLoan = await this.prisma.$transaction(async (tx) => {
+            // Attempt to decrement stock safely on the database side
+            const stockUpdate = await tx.book.updateMany({
+                where: {
+                    id: loan.bookId,
+                    availableStock: { gt: 0 }
+                },
+                data: {
+                    availableStock: { decrement: 1 },
+                },
+            });
+
+            if (stockUpdate.count === 0) {
+                // The book stock was exhausted exactly between our first read and this update
+                throw new BadRequestException('Request failed: Book stock just became unavailable. Please try again or refresh.');
+            }
+
+            // Only if stock update succeeded, we approve the loan
+            return tx.loan.update({
                 where: { id: loanId },
                 data: {
                     status: LoanStatus.APPROVED,
@@ -247,14 +308,8 @@ export class LoansService {
                         select: { id: true, title: true },
                     },
                 },
-            }),
-            this.prisma.book.update({
-                where: { id: loan.bookId },
-                data: {
-                    availableStock: { decrement: 1 },
-                },
-            }),
-        ]);
+            });
+        });
 
         // Send notification to student
         await this.notifySiswa(
@@ -341,12 +396,18 @@ export class LoansService {
             );
         }
 
-        // Use transaction to update loan and increase stock
-        const [updatedLoan] = await this.prisma.$transaction([
+        // Determine final condition (admin's assessment overrides student's)
+        const finalCondition = dto.bookCondition || loan.bookCondition || BookCondition.GOOD;
+        const isGoodCondition = finalCondition === BookCondition.GOOD;
+
+        // Build transaction: update loan + conditionally increment stock
+        const transactionOps: any[] = [
             this.prisma.loan.update({
                 where: { id: loanId },
                 data: {
                     status: LoanStatus.RETURNED,
+                    bookCondition: finalCondition,
+                    fineAmount: dto.fineAmount || null,
                     adminNotes: dto.adminNotes,
                     verifiedBy: adminId,
                 },
@@ -359,27 +420,46 @@ export class LoansService {
                     },
                 },
             }),
-            this.prisma.book.update({
-                where: { id: loan.bookId },
-                data: {
-                    availableStock: { increment: 1 },
-                },
-            }),
-        ]);
+        ];
 
-        // Send notification to student with warnings if applicable
+        // Only restore stock if book is in GOOD condition
+        if (isGoodCondition) {
+            transactionOps.push(
+                this.prisma.book.update({
+                    where: { id: loan.bookId },
+                    data: {
+                        availableStock: { increment: 1 },
+                    },
+                }),
+            );
+        }
+
+        const [updatedLoan] = await this.prisma.$transaction(transactionOps);
+
+        // Build notification
         const isLate = loan.dueDate < new Date();
-        const isDamaged = loan.bookCondition === BookCondition.DAMAGED;
+        const hasFine = dto.fineAmount && dto.fineAmount > 0;
+        const conditionLabels: Record<string, string> = {
+            GOOD: 'Baik',
+            DAMAGED: 'Rusak',
+            LOST: 'Hilang',
+        };
 
-        let title = 'Konfirmasi Pengembalian Berhasil ✅';
-        let content = `Terima kasih, transaksi Anda telah selesai. Buku telah diterima kembali oleh sistem dalam kondisi baik.\n\nDetail Transaksi:\n📖 Judul Buku: "${updatedLoan.book.title}"\n✅ Status: Dikembalikan (Tepat Waktu)${dto.adminNotes ? `\n\nPesan Admin:\n"${dto.adminNotes}"` : ''}\n\nKami mengapresiasi kedisiplinan Anda dalam menjaga kondisi buku dan ketepatan waktu pengembalian. Selamat beraktivitas kembali.`;
+        let title: string;
+        let content: string;
 
-        if (isLate || isDamaged) {
+        if (isGoodCondition && !isLate) {
+            // Happy path
+            title = 'Konfirmasi Pengembalian Berhasil ✅';
+            content = `Terima kasih, transaksi Anda telah selesai. Buku telah diterima kembali dalam kondisi baik.\n\nDetail Transaksi:\n📖 Judul Buku: "${updatedLoan.book.title}"\n✅ Status: Dikembalikan (Tepat Waktu)${dto.adminNotes ? `\n\nPesan Admin:\n"${dto.adminNotes}"` : ''}\n\nKami mengapresiasi kedisiplinan Anda. Selamat beraktivitas kembali.`;
+        } else {
+            // Issues detected
             title = 'Informasi Pengembalian dengan Catatan ⚠️';
             const warnings: string[] = [];
             if (isLate) warnings.push('⏰ Buku dikembalikan melewati batas waktu yang ditentukan');
-            if (isDamaged) warnings.push('📕 Buku dikembalikan dalam kondisi rusak/tidak layak');
-            content = `Kami menginformasikan bahwa buku telah diterima kembali, namun sistem mencatat adanya kendala pada transaksi pengembalian Anda.\n\nDetail Transaksi:\n📖 Judul Buku: "${updatedLoan.book.title}"\n\n⚠️ Catatan Khusus:\n${warnings.join('\n')}${dto.adminNotes ? `\n\nInstruksi Admin:\n"${dto.adminNotes}"` : ''}\n\nMohon segera melakukan penyelesaian administrasi atau denda (jika ada) melalui profil akun Anda atau langsung mengunjungi meja layanan perpustakaan.`;
+            if (!isGoodCondition) warnings.push(`📕 Buku dikembalikan dalam kondisi: ${conditionLabels[finalCondition] || finalCondition}`);
+
+            content = `Kami menginformasikan bahwa buku telah diterima kembali, namun ada kendala pada transaksi pengembalian Anda.\n\nDetail Transaksi:\n📖 Judul Buku: "${updatedLoan.book.title}"\n📋 Kondisi: ${conditionLabels[finalCondition] || finalCondition}\n\n⚠️ Catatan Khusus:\n${warnings.join('\n')}${hasFine ? `\n\n💰 Denda: Rp ${dto.fineAmount!.toLocaleString('id-ID')}` : ''}${dto.adminNotes ? `\n\nInstruksi Admin:\n"${dto.adminNotes}"` : ''}\n\nMohon segeralah melakukan penyelesaian administrasi pada layanan perpustakaan.`;
         }
 
         await this.notifySiswa(adminId, loan.userId, title, content);

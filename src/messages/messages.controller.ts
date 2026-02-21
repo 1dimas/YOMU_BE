@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Put,
+    Delete,
     Body,
     Param,
     Query,
@@ -65,6 +66,16 @@ export class MessagesController {
         };
     }
 
+    @Put('messages/read-all')
+    async markAllAsRead(@CurrentUser('id') userId: string) {
+        const result = await this.messagesService.markAllAsRead(userId);
+        return {
+            success: true,
+            message: 'All messages marked as read',
+            data: result,
+        };
+    }
+
     @Put('messages/:id/read')
     async markAsRead(
         @Param('id') messageId: string,
@@ -75,6 +86,33 @@ export class MessagesController {
             success: true,
             message: 'Message marked as read',
             data: null,
+        };
+    }
+
+    @Put('messages/:id')
+    async editMessage(
+        @Param('id') messageId: string,
+        @CurrentUser('id') userId: string,
+        @Body('content') content: string,
+    ) {
+        const message = await this.messagesService.editMessage(messageId, userId, content);
+        return {
+            success: true,
+            message: 'Message edited successfully',
+            data: message,
+        };
+    }
+
+    @Delete('messages/:id')
+    async deleteMessage(
+        @Param('id') messageId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        const result = await this.messagesService.deleteMessage(messageId, userId);
+        return {
+            success: true,
+            message: 'Message deleted successfully',
+            data: result,
         };
     }
 

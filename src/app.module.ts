@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
 
 // Core modules
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,23 +31,34 @@ import { ReviewsModule } from './reviews/reviews.module';
     }),
 
     // Rate limiting (increased limits for development)
-    ThrottlerModule.forRoot([
-      {
-        name: 'short',
-        ttl: 1000, // 1 second
-        limit: 10, // 10 requests per second
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redisUrl = config.get<string>('REDIS_URL');
+        return {
+          throttlers: [
+            {
+              name: 'short',
+              ttl: 1000,
+              limit: 10,
+            },
+            {
+              name: 'medium',
+              ttl: 10000,
+              limit: 100,
+            },
+            {
+              name: 'long',
+              ttl: 60000,
+              limit: 500,
+            },
+          ],
+          // Use Redis if configured, otherwise default to in-memory
+          storage: redisUrl ? new ThrottlerStorageRedisService(redisUrl) : undefined,
+        };
       },
-      {
-        name: 'medium',
-        ttl: 10000, // 10 seconds
-        limit: 100, // 100 requests per 10 seconds
-      },
-      {
-        name: 'long',
-        ttl: 60000, // 1 minute
-        limit: 500, // 500 requests per minute
-      },
-    ]),
+    }),
 
     // Core
     PrismaModule,

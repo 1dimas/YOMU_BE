@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import compression = require('compression');
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -9,12 +10,16 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
+  // Enable CORS securely by strictly allowing configured origins
+  const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3001';
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: [allowedOrigin],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
   });
+
+  // Enable gzip compression
+  app.use(compression());
 
   // Increase payload limit
   app.use(json({ limit: '50mb' }));

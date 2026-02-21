@@ -211,6 +211,67 @@ export class MessagesService {
         });
     }
 
+    async markAllAsRead(userId: string) {
+        const result = await this.prisma.message.updateMany({
+            where: {
+                receiverId: userId,
+                isRead: false,
+            },
+            data: { isRead: true },
+        });
+
+        return { markedAsRead: result.count };
+    }
+
+    // ==================== EDIT & DELETE ====================
+
+    async editMessage(messageId: string, userId: string, newContent: string) {
+        const message = await this.prisma.message.findUnique({
+            where: { id: messageId },
+        });
+
+        if (!message) {
+            throw new NotFoundException('Message not found');
+        }
+
+        if (message.senderId !== userId) {
+            throw new BadRequestException('You can only edit your own messages');
+        }
+
+        return this.prisma.message.update({
+            where: { id: messageId },
+            data: {
+                content: newContent,
+                isEdited: true,
+            },
+            include: {
+                sender: {
+                    select: { id: true, name: true, avatarUrl: true },
+                },
+            },
+        });
+    }
+
+    async deleteMessage(messageId: string, userId: string) {
+        const message = await this.prisma.message.findUnique({
+            where: { id: messageId },
+        });
+
+        if (!message) {
+            throw new NotFoundException('Message not found');
+        }
+
+        if (message.senderId !== userId) {
+            throw new BadRequestException('You can only delete your own messages');
+        }
+
+        await this.prisma.message.delete({
+            where: { id: messageId },
+        });
+
+        return { deleted: true };
+    }
+
     async getUnreadCount(userId: string) {
         const count = await this.prisma.message.count({
             where: {
