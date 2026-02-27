@@ -1,5 +1,4 @@
-import { IsOptional, IsString, IsEnum, IsNumber } from 'class-validator';
-import { BookCondition } from '@prisma/client';
+import { IsOptional, IsString, IsNumber, IsBoolean } from 'class-validator';
 
 export class AdminActionDto {
     @IsOptional()
@@ -7,8 +6,8 @@ export class AdminActionDto {
     adminNotes?: string;
 
     @IsOptional()
-    @IsEnum(BookCondition)
-    bookCondition?: BookCondition;
+    @IsBoolean()
+    isDamaged?: boolean;
 
     @IsOptional()
     @IsNumber()

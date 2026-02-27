@@ -1,7 +1,11 @@
-import { IsEnum } from 'class-validator';
-import { BookCondition } from '@prisma/client';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class ReturnBookDto {
-    @IsEnum(BookCondition)
-    bookCondition: BookCondition;
+    @IsOptional()
+    @IsBoolean()
+    reportedDamaged?: boolean;
+
+    @IsOptional()
+    @IsString()
+    studentNote?: string;
 }

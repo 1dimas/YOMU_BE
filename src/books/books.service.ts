@@ -7,6 +7,29 @@ import { Prisma } from '@prisma/client';
 export class BooksService {
     constructor(private prisma: PrismaService) { }
 
+    // Batch-fetch ratings for a list of books (replaces N+1 per-book aggregate)
+    private async attachRatings<T extends { id: string }>(books: T[]) {
+        if (books.length === 0) return [];
+
+        const bookIds = books.map(b => b.id);
+        const ratingStats = await this.prisma.review.groupBy({
+            by: ['bookId'],
+            where: { bookId: { in: bookIds } },
+            _avg: { rating: true },
+            _count: { id: true },
+        });
+
+        const ratingMap = new Map(
+            ratingStats.map(r => [r.bookId, { avg: r._avg.rating || 0, count: r._count.id || 0 }]),
+        );
+
+        return books.map(book => ({
+            ...book,
+            averageRating: ratingMap.get(book.id)?.avg || 0,
+            totalReviews: ratingMap.get(book.id)?.count || 0,
+        }));
+    }
+
     async findAll(query: QueryBooksDto) {
         const { search, categoryId, sortBy, sortOrder, page = 1, limit = 10 } = query;
         const skip = (page - 1) * limit;
@@ -53,22 +76,8 @@ export class BooksService {
             take: limit,
         });
 
-        // Get rating statistics for each book
-        const booksWithRatings = await Promise.all(
-            books.map(async (book) => {
-                const reviewStats = await this.prisma.review.aggregate({
-                    where: { bookId: book.id },
-                    _avg: { rating: true },
-                    _count: { id: true },
-                });
-
-                return {
-                    ...book,
-                    averageRating: reviewStats._avg.rating || 0,
-                    totalReviews: reviewStats._count.id || 0,
-                };
-            }),
-        );
+        // Batch-fetch ratings in a single query
+        const booksWithRatings = await this.attachRatings(books);
 
         return {
             items: booksWithRatings,
@@ -117,24 +126,8 @@ export class BooksService {
             take: limit,
         });
 
-        // Get rating statistics for each book
-        const booksWithRatings = await Promise.all(
-            books.map(async (book) => {
-                const reviewStats = await this.prisma.review.aggregate({
-                    where: { bookId: book.id },
-                    _avg: { rating: true },
-                    _count: { id: true },
-                });
-
-                return {
-                    ...book,
-                    averageRating: reviewStats._avg.rating || 0,
-                    totalReviews: reviewStats._count.id || 0,
-                };
-            }),
-        );
-
-        return booksWithRatings;
+        // Batch-fetch ratings in a single query
+        return this.attachRatings(books);
     }
 
     async findRecommendations(userId: string, limit: number = 10) {
@@ -170,24 +163,8 @@ export class BooksService {
                 take: limit,
             });
 
-            // Get rating statistics for each book
-            const booksWithRatings = await Promise.all(
-                books.map(async (book) => {
-                    const reviewStats = await this.prisma.review.aggregate({
-                        where: { bookId: book.id },
-                        _avg: { rating: true },
-                        _count: { id: true },
-                    });
-
-                    return {
-                        ...book,
-                        averageRating: reviewStats._avg.rating || 0,
-                        totalReviews: reviewStats._count.id || 0,
-                    };
-                }),
-            );
-
-            return booksWithRatings;
+            // Batch-fetch ratings in a single query
+            return this.attachRatings(books);
         }
 
         // For new users: show all available books, newest first
@@ -205,24 +182,8 @@ export class BooksService {
             take: limit,
         });
 
-        // Get rating statistics for each book
-        const booksWithRatings = await Promise.all(
-            books.map(async (book) => {
-                const reviewStats = await this.prisma.review.aggregate({
-                    where: { bookId: book.id },
-                    _avg: { rating: true },
-                    _count: { id: true },
-                });
-
-                return {
-                    ...book,
-                    averageRating: reviewStats._avg.rating || 0,
-                    totalReviews: reviewStats._count.id || 0,
-                };
-            }),
-        );
-
-        return booksWithRatings;
+        // Batch-fetch ratings in a single query
+        return this.attachRatings(books);
     }
 
     async create(dto: CreateBookDto) {

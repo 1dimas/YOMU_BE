@@ -119,7 +119,7 @@ export class ReportsService {
                 },
             }),
             damaged: await this.prisma.loan.count({
-                where: { ...where, bookCondition: 'DAMAGED' },
+                where: { ...where, isDamaged: true },
             }),
         };
 
@@ -232,11 +232,11 @@ export class ReportsService {
             loan.loanDate.toISOString().split('T')[0],
             loan.returnDate?.toISOString().split('T')[0] || '',
             loan.user.name,
-            loan.user.class || '',
+            loan.user.class?.name || '',
             loan.book.title,
             loan.book.author,
             loan.book.isbn,
-            loan.bookCondition || 'GOOD',
+            loan.isDamaged ? 'Rusak' : 'Normal',
             loan.verifier?.name || '',
         ]);
 

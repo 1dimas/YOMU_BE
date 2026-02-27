@@ -95,6 +95,7 @@ export class StatsService {
             loansThisMonth,
             loansLastMonth,
             newUsersThisMonth,
+            damagedBooks
         ] = await Promise.all([
             this.prisma.book.count({ where: { deletedAt: null } }),
             this.prisma.book.count({ where: { deletedAt: null, availableStock: { gt: 0 } } }),
@@ -111,6 +112,9 @@ export class StatsService {
             this.prisma.user.count({
                 where: { createdAt: { gte: thisMonth }, role: 'SISWA' },
             }),
+            this.prisma.loan.count({
+                where: { isDamaged: true }
+            })
         ]);
 
         // Calculate trends
@@ -145,6 +149,7 @@ export class StatsService {
                 active: activeLoans,
                 overdue: overdueLoans,
                 returning: returningLoans,
+                damaged: damagedBooks,
                 thisMonth: loansThisMonth,
                 trend: Math.round(loansTrend),
             },

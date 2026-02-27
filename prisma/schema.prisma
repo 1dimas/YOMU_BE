@@ -91,24 +91,25 @@ model Category {
 }
 
 model Loan {
-  id            String         @id @default(uuid())
-  userId        String         @map("user_id")
-  bookId        String         @map("book_id")
-  loanDate      DateTime       @default(now()) @map("loan_date")
-  dueDate       DateTime       @map("due_date")
-  returnDate    DateTime?      @map("return_date")
-  status        LoanStatus     @default(PENDING)
-  bookCondition BookCondition? @map("book_condition")
-  fineAmount    Int?           @map("fine_amount")
-  adminNotes    String?        @map("admin_notes")
-  verifiedBy    String?        @map("verified_by")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  book          Book           @relation(fields: [bookId], references: [id])
-  user          User           @relation("UserLoans", fields: [userId], references: [id])
-  verifier      User?          @relation("VerifiedLoans", fields: [verifiedBy], references: [id])
+  id         String     @id @default(uuid())
+  userId     String     @map("user_id")
+  bookId     String     @map("book_id")
+  loanDate   DateTime   @default(now()) @map("loan_date")
+  dueDate    DateTime   @map("due_date")
+  returnDate DateTime?  @map("return_date")
+  status     LoanStatus @default(PENDING)
+  isDamaged  Boolean    @default(false) @map("is_damaged")
+  fineAmount Int?       @map("fine_amount")
+  adminNotes String?    @map("admin_notes")
+  verifiedBy String?    @map("verified_by")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  book       Book       @relation(fields: [bookId], references: [id])
+  user       User       @relation("UserLoans", fields: [userId], references: [id])
+  verifier   User?      @relation("VerifiedLoans", fields: [verifiedBy], references: [id])
 
   @@index([userId])
+  @@index([bookId])
   @@index([status])
   @@map("loans")
 }
@@ -185,12 +186,6 @@ enum LoanStatus {
   RETURNED
   REJECTED
   OVERDUE
-}
-
-enum BookCondition {
-  GOOD
-  DAMAGED
-  LOST
 }
 
 enum MessageType {
