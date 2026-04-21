@@ -8,7 +8,7 @@ export class CreateLoanDto {
     @IsOptional()
     @Type(() => Number)
     @IsInt()
-    @Min(1)
+    @Min(3)
     @Max(30)
-    durationDays?: number = 7; // Default 7 days
+    durationDays?: number = 7; // Default 7 days, minimum 3 days
 }
