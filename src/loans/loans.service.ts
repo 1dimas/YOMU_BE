@@ -191,16 +191,13 @@ export class LoansService {
 
 
         // Send to admin verification (RETURNING status)
-        const noteFromStudent = dto.reportedDamaged
-            ? `⚠️ Siswa melaporkan kondisi buku: RUSAK${dto.studentNote ? ` — "${dto.studentNote}"` : ''}`
-            : null;
-
         const updatedLoan = await this.prisma.loan.update({
             where: { id: loanId },
             data: {
                 status: LoanStatus.RETURNING,
                 returnDate: new Date(),
-                ...(noteFromStudent ? { adminNotes: noteFromStudent } : {}),
+                reportedDamaged: dto.reportedDamaged || false,
+                ...(dto.studentNote ? { studentNote: dto.studentNote } : {}),
             },
             include: {
                 book: {
@@ -274,7 +271,7 @@ export class LoansService {
             adminId,
             loan.userId,
             'Konfirmasi Persetujuan Peminjaman',
-            `Yth. Pengguna,\n\nKami menginformasikan bahwa permohonan peminjaman buku Anda telah disetujui oleh pihak perpustakaan.\n\nDetail Peminjaman:\n📖 Judul Buku: "${updatedLoan.book.title}"\n📅 Batas Pengembalian: ${this.formatDate(loan.dueDate)}${dto.adminNotes ? `\n\nCatatan Admin:\n"${dto.adminNotes}"` : ''}\n\nLangkah Selanjutnya:\nSilakan mengambil buku fisik di loket pelayanan dengan menunjukkan ID Peminjaman atau kartu anggota digital Anda. Selamat membaca.`
+            `Yth. Pengguna,\n\nKami menginformasikan bahwa permohonan peminjaman buku Anda telah disetujui oleh pihak perpustakaan.\n\nDetail Peminjaman:\n📖 Judul Buku: "${updatedLoan.book.title}"\n📅 Batas Pengembalian: ${this.formatDate(loan.dueDate)}${dto.adminNotes ? `\n\nCatatan Admin:\n"${dto.adminNotes}"` : ''}\n\nLangkah Selanjutnya:\nSilakan mengambil buku fisik di loket pelayanan dengan menunjukkan ID Peminjaman atau kartu kartu pelajar Anda. Selamat membaca.`
         );
 
         return updatedLoan;

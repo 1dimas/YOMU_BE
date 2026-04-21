@@ -35,6 +35,8 @@ model User {
   majorId          String?        @map("major_id")
   classId          String?        @map("class_id")
   isActive         Boolean        @default(true) @map("is_active")
+  resetPasswordToken   String?    @unique @map("reset_password_token")
+  resetPasswordExpires DateTime?  @map("reset_password_expires")
   deletedAt        DateTime?      @map("deleted_at")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
@@ -58,7 +60,7 @@ model Book {
   author         String
   publisher      String
   year           Int
-  isbn           String     @unique
+  isbn           String     @unique @db.VarChar(13)
   categoryId     String     @map("category_id")
   synopsis       String
   coverUrl       String?    @map("cover_url")
@@ -98,8 +100,10 @@ model Loan {
   dueDate    DateTime   @map("due_date")
   returnDate DateTime?  @map("return_date")
   status     LoanStatus @default(PENDING)
-  isDamaged  Boolean    @default(false) @map("is_damaged")
-  fineAmount Int?       @map("fine_amount")
+  isDamaged       Boolean    @default(false) @map("is_damaged")
+  reportedDamaged Boolean    @default(false) @map("reported_damaged")
+  studentNote     String?    @map("student_note")
+  fineAmount      Int?       @map("fine_amount")
   adminNotes String?    @map("admin_notes")
   verifiedBy String?    @map("verified_by")
   createdAt  DateTime   @default(now()) @map("created_at")

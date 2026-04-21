@@ -9,13 +9,35 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, UpdateProfileDto, ChangePasswordDto } from './dto';
+import { RegisterDto, LoginDto, UpdateProfileDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) { }
+
+    @Post('forgot-password')
+    @HttpCode(HttpStatus.OK)
+    async forgotPassword(@Body() dto: ForgotPasswordDto) {
+        const result = await this.authService.forgotPassword(dto);
+        return {
+            success: true,
+            message: result.message,
+            data: null,
+        };
+    }
+
+    @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
+    async resetPassword(@Body() dto: ResetPasswordDto) {
+        const result = await this.authService.resetPassword(dto);
+        return {
+            success: true,
+            message: result.message,
+            data: null,
+        };
+    }
 
     @Post('register')
     async register(@Body() dto: RegisterDto) {

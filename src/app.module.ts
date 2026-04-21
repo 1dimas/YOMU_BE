@@ -21,7 +21,7 @@ import { StatsModule } from './stats/stats.module';
 import { MajorsModule } from './majors/majors.module';
 import { ClassesModule } from './classes/classes.module';
 import { ReviewsModule } from './reviews/reviews.module';
-
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -80,6 +80,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     MajorsModule,
     ClassesModule,
     ReviewsModule,
+    MailModule,
   ],
 
   providers: [

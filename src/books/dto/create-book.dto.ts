@@ -5,6 +5,7 @@ import {
     IsUUID,
     IsOptional,
     Min,
+    MaxLength,
 } from 'class-validator';
 
 
@@ -30,6 +31,7 @@ export class CreateBookDto {
 
     @IsString()
     @IsNotEmpty()
+    @MaxLength(13)
     isbn: string;
 
     @IsUUID()

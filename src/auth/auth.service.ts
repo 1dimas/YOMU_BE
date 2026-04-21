@@ -7,13 +7,16 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, UpdateProfileDto, ChangePasswordDto } from './dto';
+import { RegisterDto, LoginDto, UpdateProfileDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import { MailService } from '../mail/mail.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
     constructor(
         private prisma: PrismaService,
         private jwtService: JwtService,
+        private mailService: MailService,
     ) { }
 
     async register(dto: RegisterDto) {
@@ -129,10 +132,21 @@ export class AuthService {
     }
 
     async updateProfile(userId: string, dto: UpdateProfileDto) {
+        // If email is being changed, check for uniqueness
+        if (dto.email) {
+            const existingUser = await this.prisma.user.findFirst({
+                where: { email: dto.email, id: { not: userId } },
+            });
+            if (existingUser) {
+                throw new BadRequestException('Email sudah digunakan oleh pengguna lain');
+            }
+        }
+
         const user = await this.prisma.user.update({
             where: { id: userId },
             data: {
                 name: dto.name,
+                email: dto.email,
                 majorId: dto.majorId,
                 classId: dto.classId,
                 avatarUrl: dto.avatarUrl,
@@ -180,6 +194,74 @@ export class AuthService {
         });
 
         return { message: 'Password changed successfully' };
+    }
+
+    async forgotPassword(dto: ForgotPasswordDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { email: dto.email },
+        });
+
+        if (!user || user.deletedAt) {
+            // Log for security, but return generic success to avoid email enumeration
+            console.log(`Password reset requested for non-existent email: ${dto.email}`);
+            return { message: 'Jika email terdaftar, instruksi reset telah dikirim.' };
+        }
+
+        if (!user.isActive) {
+            throw new UnauthorizedException('Akun dinonaktifkan. Hubungi admin.');
+        }
+
+        // Generate reset token and expiry (1 hour)
+        const resetToken = uuidv4();
+        const resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                resetPasswordToken: resetToken,
+                resetPasswordExpires,
+            },
+        });
+
+        // Send email
+        try {
+            await this.mailService.sendPasswordResetEmail(user.email, resetToken);
+        } catch (error) {
+            console.error('Failed to send forgot password email:', error);
+        }
+
+        return { message: 'Jika email terdaftar, instruksi reset telah dikirim.' };
+    }
+
+    async resetPassword(dto: ResetPasswordDto) {
+        // Find user by token
+        const user = await this.prisma.user.findUnique({
+            where: { resetPasswordToken: dto.token },
+        });
+
+        if (!user || user.deletedAt) {
+            throw new BadRequestException('Token reset password tidak valid atau kedaluwarsa');
+        }
+
+        // Check expiry
+        if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
+            throw new BadRequestException('Token reset password kedaluwarsa');
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+        // Update password and clear token
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                resetPasswordToken: null,
+                resetPasswordExpires: null,
+            },
+        });
+
+        return { message: 'Password berhasil diatur ulang. Silakan login.' };
     }
 
     private generateToken(userId: string, email: string, role: string): string {

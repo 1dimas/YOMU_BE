@@ -9,7 +9,7 @@ ALTER TABLE "categories" ADD COLUMN     "deleted_at" TIMESTAMP(3);
 
 -- AlterTable
 ALTER TABLE "messages" ADD COLUMN     "is_edited" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL;
+ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- CreateIndex
 CREATE INDEX "books_title_idx" ON "books"("title");

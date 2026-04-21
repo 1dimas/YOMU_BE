@@ -155,7 +155,7 @@ async function main() {
                 author: 'Andrea Hirata',
                 publisher: 'Bentang Pustaka',
                 year: 2005,
-                isbn: '978-979-1227-93-2',
+                isbn: '9789791227932',
                 categoryId: categories[0].id, // Fiksi
                 synopsis: 'Novel tentang perjuangan anak-anak Belitung dalam menempuh pendidikan.',
                 stock: 5,
@@ -168,7 +168,7 @@ async function main() {
                 author: 'Pramoedya Ananta Toer',
                 publisher: 'Hasta Mitra',
                 year: 1980,
-                isbn: '978-602-8066-13-1',
+                isbn: '9786028066131',
                 categoryId: categories[0].id, // Fiksi
                 synopsis: 'Kisah Minke, seorang pribumi terpelajar di masa kolonial Belanda.',
                 stock: 3,
@@ -181,7 +181,7 @@ async function main() {
                 author: 'Yuval Noah Harari',
                 publisher: 'Harper',
                 year: 2014,
-                isbn: '978-0-06-231609-7',
+                isbn: '9780062316097',
                 categoryId: categories[1].id, // Non-Fiksi
                 synopsis: 'Sejarah umat manusia dari zaman prasejarah hingga modern.',
                 stock: 2,
@@ -194,7 +194,7 @@ async function main() {
                 author: 'Tim Penulis',
                 publisher: 'Kemendikbud',
                 year: 2023,
-                isbn: '978-602-282-123-4',
+                isbn: '9786022821234',
                 categoryId: categories[2].id, // Akademik
                 synopsis: 'Buku pelajaran matematika untuk siswa SMA.',
                 stock: 10,
@@ -207,7 +207,7 @@ async function main() {
                 author: 'Masashi Kishimoto',
                 publisher: 'Elex Media',
                 year: 2000,
-                isbn: '978-979-27-1234-5',
+                isbn: '9789792712345',
                 categoryId: categories[3].id, // Komik
                 synopsis: 'Kisah Naruto Uzumaki, ninja muda yang bermimpi menjadi Hokage.',
                 stock: 4,
@@ -220,7 +220,7 @@ async function main() {
                 author: 'Walter Isaacson',
                 publisher: 'Simon & Schuster',
                 year: 2011,
-                isbn: '978-1-4516-4853-9',
+                isbn: '9781451648539',
                 categoryId: categories[4].id, // Biografi
                 synopsis: 'Biografi resmi pendiri Apple Inc.',
                 stock: 2,
